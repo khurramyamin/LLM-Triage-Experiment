@@ -1,0 +1,16 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+/.specstory
+
+# Manuscript (kept in a separate private repo)
+nature_medicine_paper/

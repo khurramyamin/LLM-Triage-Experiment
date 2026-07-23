@@ -12,5 +12,7 @@ __pycache__/
 .DS_Store
 /.specstory
 
-# Manuscript (kept in a separate private repo)
-nature_medicine_paper/
+# Manuscript (kept in a separate private repo); only the rendered figures
+# are published here so make_paper_figures.py has its documented output folder.
+nature_medicine_paper/*
+!nature_medicine_paper/figures/

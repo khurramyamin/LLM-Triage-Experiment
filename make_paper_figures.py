@@ -336,17 +336,29 @@ def figure1b(configs_by_name: dict, config_order=None, out_dir=None,
 
     fig, axn = plt.subplots(figsize=(8.2, 4.2))
     ratios = []
+    hi_edges = []
     for n in names:
-        r = configs_by_name[n]["baseline_ratio"]
+        cfg = configs_by_name[n]
+        r = cfg["baseline_ratio"]
         if r is None:
             continue
         ratios.append(r)
         fam, reason = parse(n)
-        axn.plot(r, row_of[tier_fn(n)], marker=FAMILY_MARKER[fam],
+        row = row_of[tier_fn(n)]
+        ci = A.bootstrap_ratio_ci(cfg["belief"], cfg["decisions"],
+                                  "decision_baseline")
+        if ci is not None:
+            lo, hi_ci = ci
+            hi_edges.append(hi_ci)
+            axn.errorbar(r, row,
+                         xerr=[[max(r - lo, 0.0)], [max(hi_ci - r, 0.0)]],
+                         fmt="none", ecolor=FAMILY_CMAP[fam](0.55),
+                         elinewidth=1.4, capsize=3.5, capthick=1.4, zorder=4)
+        axn.plot(r, row, marker=FAMILY_MARKER[fam],
                  markersize=15, color=FAMILY_CMAP[fam](0.85),
                  markeredgecolor="k", markeredgewidth=0.7, zorder=5)
     axn.axvline(1.0, color="0.6", ls="--", lw=1.0, zorder=1)
-    hi = max(ratios) * 1.18
+    hi = max(ratios + hi_edges) * 1.18
     axn.set_xscale("log")
     axn.set_xlim(0.9, hi)
     axn.set_ylim(-0.6, top_row + 1.1)
@@ -539,15 +551,49 @@ def figure_belief_consistency(configs_by_name: dict) -> None:
     regimes = A.UTILITY_REGIMES
     x = list(range(len(regimes)))
     fig, ax = plt.subplots(figsize=(8.4, 6.2))
+
+    def est_indicators(c, regime):
+        p_star = c["p_star_est"].get(regime)
+        if p_star is None:
+            return []
+        belief = c["belief"]
+        out = []
+        for ctx, dec in c["decisions"].get(regime, {}).items():
+            if ctx in belief:
+                rule = 1 if belief[ctx] >= p_star else 0
+                out.append(int(rule == dec))
+        return out
+
     for name in names:
         c = configs_by_name[name]
         st = style(name)
         y = [100 * c["est_consistency"][r] for r in regimes]
-        ax.plot(x, y, marker=st["marker"], ls=st["ls"], color=st["color"], lw=2.0,
-                markersize=7, markeredgecolor="k", markeredgewidth=0.5,
-                label=st["label"], zorder=4)
+        elo, ehi = [], []
+        for r in regimes:
+            yr = c["est_consistency"][r]
+            ind = est_indicators(c, r)
+            ci = A.bootstrap_prop_ci(ind) if ind else None
+            if ci is not None and not np.isnan(yr):
+                elo.append(max(100 * yr - 100 * ci[0], 0.0))
+                ehi.append(max(100 * ci[1] - 100 * yr, 0.0))
+            else:
+                elo.append(0.0)
+                ehi.append(0.0)
+        ax.errorbar(x, y, yerr=[elo, ehi], marker=st["marker"], ls=st["ls"],
+                    color=st["color"], lw=2.0, markersize=7,
+                    markeredgecolor="k", markeredgewidth=0.5,
+                    ecolor=st["color"], elinewidth=1.0, capsize=2.5,
+                    capthick=1.0, label=st["label"], zorder=4)
         base = c["est_consistency"].get("decision_baseline")
         if base is not None and not np.isnan(base):
+            bind = est_indicators(c, "decision_baseline")
+            bci = A.bootstrap_prop_ci(bind) if bind else None
+            if bci is not None:
+                ax.errorbar(-0.55, 100 * base,
+                            yerr=[[max(100 * base - 100 * bci[0], 0.0)],
+                                  [max(100 * bci[1] - 100 * base, 0.0)]],
+                            fmt="none", ecolor=st["color"], elinewidth=1.0,
+                            capsize=2.5, capthick=1.0, clip_on=False, zorder=5)
             ax.plot(-0.55, 100 * base, marker=st["marker"], markersize=9,
                     color=st["color"], markeredgecolor="k", markeredgewidth=0.6,
                     clip_on=False, zorder=5)
@@ -586,19 +632,42 @@ def figure_nature_consistency() -> None:
             continue
         their, our = O._load_config_decisions(results_csv)
         st = style(name)
-        y = []
+        y, elo, ehi = [], [], []
         for r in regimes:
             dec = our.get(r, {})
             ctxs = [c for c in dec if c in their]
-            y.append(100 * sum(int(dec[c] == their[c]) for c in ctxs) / len(ctxs)
-                     if ctxs else float("nan"))
-        ax.plot(x, y, marker=st["marker"], ls=st["ls"], color=st["color"], lw=2.0,
-                markersize=7, markeredgecolor="k", markeredgewidth=0.5,
-                label=st["label"], zorder=4)
+            if ctxs:
+                ind = [int(dec[c] == their[c]) for c in ctxs]
+                yr = 100 * sum(ind) / len(ind)
+                y.append(yr)
+                ci = A.bootstrap_prop_ci(ind)
+                if ci is not None:
+                    elo.append(max(yr - 100 * ci[0], 0.0))
+                    ehi.append(max(100 * ci[1] - yr, 0.0))
+                else:
+                    elo.append(0.0)
+                    ehi.append(0.0)
+            else:
+                y.append(float("nan"))
+                elo.append(0.0)
+                ehi.append(0.0)
+        ax.errorbar(x, y, yerr=[elo, ehi], marker=st["marker"], ls=st["ls"],
+                    color=st["color"], lw=2.0, markersize=7,
+                    markeredgecolor="k", markeredgewidth=0.5,
+                    ecolor=st["color"], elinewidth=1.0, capsize=2.5,
+                    capthick=1.0, label=st["label"], zorder=4)
         dec = our.get("decision_baseline", {})
         ctxs = [c for c in dec if c in their]
         if ctxs:
-            base = 100 * sum(int(dec[c] == their[c]) for c in ctxs) / len(ctxs)
+            ind = [int(dec[c] == their[c]) for c in ctxs]
+            base = 100 * sum(ind) / len(ind)
+            bci = A.bootstrap_prop_ci(ind)
+            if bci is not None:
+                ax.errorbar(-0.55, base,
+                            yerr=[[max(base - 100 * bci[0], 0.0)],
+                                  [max(100 * bci[1] - base, 0.0)]],
+                            fmt="none", ecolor=st["color"], elinewidth=1.0,
+                            capsize=2.5, capthick=1.0, clip_on=False, zorder=5)
             ax.plot(-0.55, base, marker=st["marker"], markersize=9,
                     color=st["color"], markeredgecolor="k", markeredgewidth=0.6,
                     clip_on=False, zorder=5)

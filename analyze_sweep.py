@@ -110,6 +110,25 @@ def bootstrap_ratio_ci(belief: dict, decisions: dict, regime: str,
     return float(lo), float(hi)
 
 
+def bootstrap_prop_ci(indicators, n_boot: int = 4000, seed: int = 0):
+    """Percentile 95% CI for the mean of a list of 0/1 indicators.
+
+    Resamples the indicators with replacement and returns (lo, hi) from the
+    2.5/97.5 percentiles of the bootstrap distribution of the mean. Used for
+    the agreement-rate figures (decision<->belief consistency and agreement
+    with the deployed tool), where each independent observation is one
+    per-variant decision.
+    """
+    a = np.asarray(indicators, dtype=float)
+    n = len(a)
+    if n == 0:
+        return None
+    rng = np.random.default_rng(seed)
+    draws = a[rng.integers(0, n, size=(n_boot, n))].mean(axis=1)
+    lo, hi = np.percentile(draws, [2.5, 97.5])
+    return float(lo), float(hi)
+
+
 def analyse_config(cfg_dir: Path) -> dict:
     belief, decisions, gold = load_results(cfg_dir / "results.csv")
     fit = json.loads((cfg_dir / "fit.json").read_text(encoding="utf-8"))

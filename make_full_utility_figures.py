@@ -84,12 +84,12 @@ RATIO_LBL = {
 
 # Best fixed decision rule shown in the ROC grid (fig3): the single belief
 # threshold minimising cost-weighted error for a given FN/FP ratio. We show
-# three ratios in distinct square colours (1 stays yellow); .2 leans efficiency
-# and 5 leans safety, spreading the points along the belief ROC.
+# three ratios in distinct square colours; .2 leans efficiency and 5 leans
+# safety (yellow), spreading the points along the belief ROC.
 BEST_FIXED_SQUARES = [
     (0.2, "#1b9e77"),
-    (1, "gold"),
-    (5, "#e7298a"),
+    (1, "#e7298a"),
+    (5, "gold"),
 ]
 
 
@@ -407,16 +407,27 @@ def figure2(configs_by_name: dict, config_order=None, out_dir=None,
             if c is None:
                 continue
             st = style_fn(name)
-            xs, ys = [], []
+            xs, ys, elo, ehi = [], [], [], []
             for regime in A.UTILITY_REGIMES:
                 if c["recovered"].get(regime) is not None:
                     xs.append(A.TARGET_RATIO[regime])
                     recovered = c["recovered"][regime]
-                    ys.append(min(max(recovered, FLOOR), CEIL))
-            ax.plot(xs, ys, marker=st["marker"], ls=st["ls"],
-                    color=st["color"], lw=2.0, markersize=8,
-                    markeredgecolor="k", markeredgewidth=0.5,
-                    label=st["label"], zorder=4)
+                    y = min(max(recovered, FLOOR), CEIL)
+                    ys.append(y)
+                    ci = A.bootstrap_ratio_ci(c["belief"], c["decisions"], regime)
+                    if ci is not None:
+                        lo = min(max(ci[0], FLOOR), CEIL)
+                        hi = min(max(ci[1], FLOOR), CEIL)
+                        elo.append(max(y - lo, 0.0))
+                        ehi.append(max(hi - y, 0.0))
+                    else:
+                        elo.append(0.0)
+                        ehi.append(0.0)
+            ax.errorbar(xs, ys, yerr=[elo, ehi], marker=st["marker"], ls=st["ls"],
+                        color=st["color"], lw=2.0, markersize=8,
+                        markeredgecolor="k", markeredgewidth=0.5,
+                        ecolor=st["color"], elinewidth=1.2, capsize=3,
+                        capthick=1.1, label=st["label"], zorder=4)
 
         ax.set_xscale("log")
         ax.set_yscale("log")
@@ -582,20 +593,33 @@ def figure4() -> None:
                 BELIEF_SWEEP / name / "results.csv")
             _b, decisions, _g2 = A.load_results(cfg_dir / "results.csv")
             st = style(name)
-            xs, ys = [], []
+            xs, ys, elo, ehi = [], [], [], []
             for regime in THRESH_REGIMES:
                 dctx = decisions.get(regime, {})
                 rec = _recovered_threshold(belief, dctx) if dctx else None
                 if rec is not None:
                     xs.append(PROMPTED_PSTAR[regime])
                     ys.append(rec)
+                    ci = A.bootstrap_ratio_ci(belief, decisions, regime)
+                    if ci is not None:
+                        r_lo, r_hi = ci
+                        t_lo = 1.0 / (1.0 + r_hi)   # threshold decreases in ratio
+                        t_hi = 1.0 / (1.0 + r_lo)
+                        elo.append(max(rec - t_lo, 0.0))
+                        ehi.append(max(t_hi - rec, 0.0))
+                    else:
+                        elo.append(0.0)
+                        ehi.append(0.0)
             order = np.argsort(xs)
             xs = list(np.array(xs)[order])
             ys = list(np.array(ys)[order])
-            ax.plot(xs, ys, marker=st["marker"], ls=st["ls"],
-                    color=st["color"], lw=2.0, markersize=8,
-                    markeredgecolor="k", markeredgewidth=0.5,
-                    label=st["label"], zorder=4)
+            elo = list(np.array(elo)[order])
+            ehi = list(np.array(ehi)[order])
+            ax.errorbar(xs, ys, yerr=[elo, ehi], marker=st["marker"], ls=st["ls"],
+                        color=st["color"], lw=2.0, markersize=8,
+                        markeredgecolor="k", markeredgewidth=0.5,
+                        ecolor=st["color"], elinewidth=1.2, capsize=3,
+                        capthick=1.1, label=st["label"], zorder=4)
 
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)

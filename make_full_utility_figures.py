@@ -102,9 +102,10 @@ def figure1() -> None:
 
     left_names = ["gpt-5-mini_re-medium", "gpt-5-mini_re-high"]
     adv_name = "gpt-5.4_re-medium"
+    adv_high_name = "gpt-5.4_re-high"
     deepseek_name = "DeepSeek-V4-Pro_re-high"
     claude_name = "Claude-Fable-5_re-high"
-    load_names = left_names + [adv_name, deepseek_name, claude_name]
+    load_names = left_names + [adv_name, adv_high_name, deepseek_name, claude_name]
     frontier = {c["name"]: c for c in res["configs"] if c["name"] in load_names}
     regime_pts = {
         n: O.load_regime_op_points(SWEEP / n / "results.csv")
@@ -114,6 +115,7 @@ def figure1() -> None:
         "gpt-5-mini_re-medium": "#3976b9",
         "gpt-5-mini_re-high": "#08306b",
         "gpt-5.4_re-medium": "#d65a2a",
+        "gpt-5.4_re-high": "#d65a2a",
         "DeepSeek-V4-Pro_re-high": "#2f8a57",
         "Claude-Fable-5_re-high": "#a50f15",
     }
@@ -216,9 +218,9 @@ def figure1() -> None:
 
     def render_grid() -> None:
         panel_specs = [
-            ("gpt-5-mini_re-medium", "GPT-5 Mini \u00b7 High", "#3976b9",
+            ("gpt-5-mini_re-high", "GPT-5 Mini \u00b7 High", "#3976b9",
              "#f3f7fc", (0.60, 0.72)),
-            ("gpt-5.4_re-medium", "GPT-5.4 \u00b7 High", "#d65a2a",
+            ("gpt-5.4_re-high", "GPT-5.4 \u00b7 High", "#d65a2a",
              "#fcf5f1", (0.50, 0.66)),
             ("DeepSeek-V4-Pro_re-high", "DeepSeek-V4-Pro \u00b7 High",
              "#2f8a57", "#f2f8f4", (0.50, 0.84)),
